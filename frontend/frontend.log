@@ -1,0 +1,44 @@
+$ vite dev --host
+
+  VITE v5.4.21  ready in 27470 ms
+
+  ➜  Local:   https://localhost:5173/
+  ➜  Network: https://192.168.111.250:5173/
+  ➜  Network: https://10.147.20.61:5173/
+4:50:17 PM [vite-plugin-svelte] /Users/macbookair/Documents/website/burningroom/e-ticketing/frontend/src/routes/(app)/+layout.svelte:7:11 Layout has unused export property 'data'. If it is for external reference only, please consider using `export const data`
+4:50:18 PM [vite-plugin-svelte] /Users/macbookair/Documents/website/burningroom/e-ticketing/frontend/src/routes/(app)/+layout.svelte:8:11 Layout has unused export property 'form'. If it is for external reference only, please consider using `export const form`
+4:50:18 PM [vite-plugin-svelte] /Users/macbookair/Documents/website/burningroom/e-ticketing/frontend/src/routes/(app)/+layout.svelte:9:11 Layout has unused export property 'params'. If it is for external reference only, please consider using `export const params`
+4:50:25 PM [vite-plugin-svelte] /Users/macbookair/Documents/website/burningroom/e-ticketing/frontend/src/routes/(app)/kasir/+page.svelte:1:29 Page has unused export property 'data'. If it is for external reference only, please consider using `export const data`
+4:50:25 PM [vite-plugin-svelte] /Users/macbookair/Documents/website/burningroom/e-ticketing/frontend/src/routes/(app)/kasir/+page.svelte:2:11 Page has unused export property 'form'. If it is for external reference only, please consider using `export const form`
+4:50:25 PM [vite-plugin-svelte] /Users/macbookair/Documents/website/burningroom/e-ticketing/frontend/src/routes/(app)/kasir/+page.svelte:3:11 Page has unused export property 'params'. If it is for external reference only, please consider using `export const params`
+4:50:25 PM [vite-plugin-svelte] /Users/macbookair/Documents/website/burningroom/e-ticketing/frontend/src/routes/(app)/kasir/+page.svelte:679:2 Unused CSS selector "[data-theme='dark'] .cat-btn.active"
+4:50:25 PM [vite-plugin-svelte] /Users/macbookair/Documents/website/burningroom/e-ticketing/frontend/src/routes/(app)/kasir/+page.svelte:686:2 Unused CSS selector "[data-theme='dark'] .action-btn.active"
+4:50:25 PM [vite-plugin-svelte] /Users/macbookair/Documents/website/burningroom/e-ticketing/frontend/src/routes/(app)/kasir/+page.svelte:718:2 Unused CSS selector "[data-theme='dark'] .var-opt:hover"
+4:50:25 PM [vite-plugin-svelte] /Users/macbookair/Documents/website/burningroom/e-ticketing/frontend/src/routes/(app)/kasir/+page.svelte:845:4 Unused CSS selector "[data-theme='dark'] .mobile-nav-btn.active"
+4:50:25 PM [vite-plugin-svelte] /Users/macbookair/Documents/website/burningroom/e-ticketing/frontend/src/routes/login/+page.svelte:1:29 Page has unused export property 'data'. If it is for external reference only, please consider using `export const data`
+4:50:25 PM [vite-plugin-svelte] /Users/macbookair/Documents/website/burningroom/e-ticketing/frontend/src/routes/login/+page.svelte:2:11 Page has unused export property 'form'. If it is for external reference only, please consider using `export const form`
+4:50:25 PM [vite-plugin-svelte] /Users/macbookair/Documents/website/burningroom/e-ticketing/frontend/src/routes/login/+page.svelte:3:11 Page has unused export property 'params'. If it is for external reference only, please consider using `export const params`
+4:50:25 PM [vite-plugin-svelte] /Users/macbookair/Documents/website/burningroom/e-ticketing/frontend/src/routes/login/+page.svelte:365:2 Unused CSS selector "[data-theme='dark'] .bg-blob-1"
+4:50:25 PM [vite-plugin-svelte] /Users/macbookair/Documents/website/burningroom/e-ticketing/frontend/src/routes/login/+page.svelte:366:2 Unused CSS selector "[data-theme='dark'] .bg-blob-2"
+4:50:26 PM [vite-plugin-svelte] /Users/macbookair/Documents/website/burningroom/e-ticketing/frontend/src/routes/+layout.svelte:5:11 Layout has unused export property 'data'. If it is for external reference only, please consider using `export const data`
+4:50:26 PM [vite-plugin-svelte] /Users/macbookair/Documents/website/burningroom/e-ticketing/frontend/src/routes/+layout.svelte:6:11 Layout has unused export property 'form'. If it is for external reference only, please consider using `export const form`
+4:50:26 PM [vite-plugin-svelte] /Users/macbookair/Documents/website/burningroom/e-ticketing/frontend/src/routes/+layout.svelte:7:11 Layout has unused export property 'params'. If it is for external reference only, please consider using `export const params`
+4:50:27 PM [vite] page reload .svelte-kit/generated/client/nodes/0.js
+4:50:27 PM [vite] page reload .svelte-kit/generated/client/nodes/1.js
+4:50:27 PM [vite] page reload .svelte-kit/generated/client/nodes/2.js
+4:50:28 PM [vite] page reload .svelte-kit/generated/client/nodes/5.js
+4:50:28 PM [vite] page reload .svelte-kit/generated/client/nodes/18.js
+4:50:28 PM [vite] page reload .svelte-kit/generated/client/app.js
+4:50:28 PM [vite] page reload .svelte-kit/generated/client/matchers.js
+4:50:28 PM [vite] page reload .svelte-kit/generated/shared/error-template.js
+4:50:28 PM [vite] page reload .svelte-kit/generated/server/internal.js
+4:50:30 PM [vite] page reload .svelte-kit/generated/client/nodes/2.js
+4:50:41 PM [vite-plugin-svelte] /Users/macbookair/Documents/website/burningroom/e-ticketing/frontend/src/lib/components/pos/ProductGrid.svelte:24:4 A11y: <button> cannot have role 'listitem'
+4:50:41 PM [vite-plugin-svelte] /Users/macbookair/Documents/website/burningroom/e-ticketing/frontend/src/lib/components/pos/CheckoutModal.svelte:219:2 Unused CSS selector "[data-theme='dark'] .pm-btn.active"
+4:50:43 PM [vite-plugin-svelte] /Users/macbookair/Documents/website/burningroom/e-ticketing/frontend/src/lib/components/ui/Modal.svelte:22:2 A11y: visible, non-interactive elements with an on:click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as <button type="button"> or <a> might be more appropriate. See https://svelte.dev/docs/accessibility-warnings#a11y-click-events-have-key-events for more details.
+4:50:43 PM [vite-plugin-svelte] /Users/macbookair/Documents/website/burningroom/e-ticketing/frontend/src/lib/components/ui/Modal.svelte:22:2 A11y: Non-interactive element <div> should not be assigned mouse or keyboard event listeners.
+4:50:47 PM [vite-plugin-svelte] /Users/macbookair/Documents/website/burningroom/e-ticketing/frontend/src/lib/components/print/PrintModal.svelte:756:2 Unused CSS selector "[data-theme="dark"] .nota-preview"
+4:50:47 PM [vite-plugin-svelte] /Users/macbookair/Documents/website/burningroom/e-ticketing/frontend/src/lib/components/print/PrintModal.svelte:782:2 Unused CSS selector "[data-theme="dark"] .preview-sub"
+4:50:47 PM [vite-plugin-svelte] /Users/macbookair/Documents/website/burningroom/e-ticketing/frontend/src/lib/components/print/PrintModal.svelte:807:2 Unused CSS selector "[data-theme="dark"] .preview-row.sm-details"
+4:50:53 PM [vite-plugin-svelte] /Users/macbookair/Documents/website/burningroom/e-ticketing/frontend/src/lib/components/layout/Topbar.svelte:34:23 A11y: Redundant role 'banner'
+4:50:53 PM [vite-plugin-svelte] /Users/macbookair/Documents/website/burningroom/e-ticketing/frontend/src/lib/components/layout/Sidebar.svelte:172:2 Unused CSS selector "[data-theme='dark'] .nav-item.active"

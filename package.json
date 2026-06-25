@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "@node-escpos/bluetooth-adapter": "^0.1.0",
+    "@point-of-sale/receipt-printer-encoder": "^3.0.3",
+    "@point-of-sale/webbluetooth-receipt-printer": "^2.0.0",
+    "escpos": "^3.0.0-alpha.6"
+  }
+}

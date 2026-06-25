@@ -1,0 +1,22 @@
+[Unit]
+Description=TiketKu POS Rust Backend Server
+After=network.target postgresql.service redis.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/var/www/e-ticketing/backend
+ExecStart=/var/www/e-ticketing/backend/target/release/tiketku-api
+Restart=always
+RestartSec=5
+Environment=DATABASE_URL=postgres://tiketku:tiketku@localhost:5432/tiketku
+Environment=REDIS_URL=redis://127.0.0.1:6379
+Environment=PORT=8080
+Environment=HOST=127.0.0.1
+Environment=RUST_LOG=tiketku_api=info,tower_http=info
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=tiketku-backend
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,79 @@
+version: '3.9'
+
+services:
+  # ── PostgreSQL ──────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: tiketku-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: tiketku
+      POSTGRES_PASSWORD: tiketku
+      POSTGRES_DB: tiketku
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tiketku"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Redis ─────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: tiketku-redis
+    restart: unless-stopped
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # ── API (Rust/Axum) ───────────────────────────────────────
+  api:
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile
+    container_name: tiketku-api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://tiketku:tiketku@postgres:5432/tiketku
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: change-this-in-production-use-a-long-random-string
+      HOST: 0.0.0.0
+      PORT: 8080
+      ALLOWED_ORIGINS: http://localhost:5173,http://localhost:4173
+      RUST_LOG: tiketku_api=info,tower_http=warn
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── Frontend (SvelteKit) ────────────────────────────────
+  frontend:
+    build:
+      context: ../../frontend
+      dockerfile: Dockerfile
+    container_name: tiketku-frontend
+    restart: unless-stopped
+    environment:
+      VITE_API_URL: http://api:8080/api
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:
+  redis_data:

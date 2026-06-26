@@ -28,6 +28,23 @@ if [ -z "$DOMAIN" ]; then
   exit 1
 fi
 
+# 2.5 Pengecekan Dependensi yang Sudah Terinstal (True/False)
+echo -e "\n${BLUE}=== Memeriksa Status Instalasi Dependensi ===${NC}"
+check_status() {
+  if command -v "$1" &> /dev/null; then
+    echo -e "  - $2: ${GREEN}True (Sudah terinstal)${NC}"
+  else
+    echo -e "  - $2: ${RED}False (Belum terinstal)${NC}"
+  fi
+}
+
+check_status "nginx" "Nginx Reverse Proxy"
+check_status "psql" "PostgreSQL Database"
+check_status "redis-server" "Redis Cache Server"
+check_status "bun" "Bun Runtime"
+check_status "cargo" "Rust/Cargo Compiler"
+echo -e "=============================================\n"
+
 # 3. Install System Dependencies (Ubuntu/Debian)
 echo -e "\n${BLUE}[1/8] Menginstal paket-paket dasar Linux...${NC}"
 apt-get update
@@ -56,18 +73,52 @@ fi
 # 6. Setup PostgreSQL Database
 echo -e "\n${BLUE}[4/8] Mengonfigurasi PostgreSQL...${NC}"
 # Pastikan Postgres aktif
-systemctl start postgresql
-systemctl enable postgresql
+systemctl start postgresql || true
+systemctl enable postgresql || true
 
-# Buat role tiketku dan database tiketku jika belum ada
-sudo -u postgres psql -c "CREATE USER tiketku WITH PASSWORD 'tiketku';" 2>/dev/null || true
-sudo -u postgres psql -c "ALTER USER tiketku WITH SUPERUSER;" 2>/dev/null || true
-sudo -u postgres psql -c "CREATE DATABASE tiketku OWNER tiketku;" 2>/dev/null || true
+echo -n "Apakah Anda ingin menggunakan PostgreSQL yang sudah ada dengan kredensial kustom? (y/n) [default: n]: "
+read USE_EXISTING_DB
+
+if [ "$USE_EXISTING_DB" = "y" ] || [ "$USE_EXISTING_DB" = "Y" ]; then
+  echo -n "Masukkan Host PostgreSQL [default: localhost]: "
+  read DB_HOST
+  DB_HOST=${DB_HOST:-localhost}
+
+  echo -n "Masukkan Port PostgreSQL [default: 5432]: "
+  read DB_PORT
+  DB_PORT=${DB_PORT:-5432}
+
+  echo -n "Masukkan Nama Database [default: tiketku]: "
+  read DB_NAME
+  DB_NAME=${DB_NAME:-tiketku}
+
+  echo -n "Masukkan Username PostgreSQL [default: tiketku]: "
+  read DB_USER
+  DB_USER=${DB_USER:-tiketku}
+
+  echo -n "Masukkan Password PostgreSQL: "
+  read -s DB_PASS
+  echo "" # Newline setelah input password tersembunyi
+else
+  # Default setup (Auto create new user & database locally)
+  DB_HOST="localhost"
+  DB_PORT="5432"
+  DB_NAME="tiketku"
+  DB_USER="tiketku"
+  DB_PASS="tiketku"
+
+  echo -e "\nMembuat user & database default..."
+  sudo -u postgres psql -c "CREATE USER $DB_USER WITH PASSWORD '$DB_PASS';" 2>/dev/null || true
+  sudo -u postgres psql -c "ALTER USER $DB_USER WITH SUPERUSER;" 2>/dev/null || true
+  sudo -u postgres psql -c "CREATE DATABASE $DB_NAME OWNER $DB_USER;" 2>/dev/null || true
+fi
 
 # Import skema database awal
 echo -e "${BLUE}Menyalin struktur skema awal database...${NC}"
 cd ../..
-sudo -u postgres psql -d tiketku -f infra/migrations/0001_initial.sql
+PGPASSWORD="$DB_PASS" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -f infra/migrations/0001_initial.sql 2>/dev/null || \
+sudo -u postgres psql -d "$DB_NAME" -f infra/migrations/0001_initial.sql 2>/dev/null || \
+echo -e "${YELLOW}Warning: Gagal mengimpor skema awal secara langsung. Jika tabel sudah ada, silakan abaikan.${NC}"
 cd infra/vps
 
 # 7. Salin & Siapkan Environment (.env)
@@ -83,7 +134,22 @@ fi
 
 # Generate .env untuk backend jika belum ada
 if [ ! -f "backend/.env" ]; then
-  cp backend/.env.example backend/.env 2>/dev/null || cp backend/.env backend/.env
+  if [ -f "backend/.env.example" ]; then
+    cp backend/.env.example backend/.env
+  else
+    echo -e "${YELLOW}Warning: backend/.env.example tidak ditemukan. Membuat file backend/.env baru.${NC}"
+    touch backend/.env
+  fi
+fi
+
+# Update DATABASE_URL di backend/.env secara aman tanpa sed -i
+echo -e "${BLUE}Mengonfigurasi DATABASE_URL di backend/.env...${NC}"
+if grep -q "^DATABASE_URL=" "backend/.env"; then
+  grep -v "^DATABASE_URL=" "backend/.env" > "backend/.env.tmp"
+  echo "DATABASE_URL=postgres://$DB_USER:$DB_PASS@$DB_HOST:$DB_PORT/$DB_NAME" >> "backend/.env.tmp"
+  mv "backend/.env.tmp" "backend/.env"
+else
+  echo "DATABASE_URL=postgres://$DB_USER:$DB_PASS@$DB_HOST:$DB_PORT/$DB_NAME" >> "backend/.env"
 fi
 
 # Update ALLOWED_ORIGINS di backend/.env

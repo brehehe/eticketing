@@ -32,6 +32,15 @@ async function request<T>(
   });
 
   if (res.status === 401) {
+    if (path === '/auth/login' || path === '/auth/2fa/verify') {
+      const data = await res.json().catch(() => ({}));
+      throw {
+        status: 401,
+        message: data.message ?? 'Terjadi kesalahan',
+        errors: data.errors,
+      } as ApiError;
+    }
+
     // Clear session and redirect to login
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem('tk-token');

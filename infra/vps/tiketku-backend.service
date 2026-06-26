@@ -11,7 +11,7 @@ Restart=always
 RestartSec=5
 Environment=DATABASE_URL=postgres://tiketku:tiketku@localhost:5432/tiketku
 Environment=REDIS_URL=redis://127.0.0.1:6379
-Environment=PORT=8080
+Environment=PORT=8081
 Environment=HOST=127.0.0.1
 Environment=RUST_LOG=tiketku_api=info,tower_http=info
 StandardOutput=syslog

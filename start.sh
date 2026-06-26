@@ -196,9 +196,9 @@ else
 fi
 
 # 3. Jalankan Backend (Rust)
-echo -e "${BLUE}[3/4] Menjalankan Rust Backend (Port 8080)...${NC}"
+echo -e "${BLUE}[3/4] Menjalankan Rust Backend (Port 8081)...${NC}"
 cd backend
-lsof -ti:8080 | xargs kill -9 2>/dev/null || true
+lsof -ti:8081 | xargs kill -9 2>/dev/null || true
 cargo run > backend.log 2>&1 &
 BACKEND_PID=$!
 cd ..
@@ -230,7 +230,7 @@ if [ "$MODE" = "local" ]; then
 else
   echo -e "  - Frontend (HTTPS): ${BLUE}https://${DOMAIN}:5173${NC}"
 fi
-echo -e "  - Backend API: ${BLUE}http://localhost:8080/api/health${NC}"
+echo -e "  - Backend API: ${BLUE}http://localhost:8081/api/health${NC}"
 echo -e "\nLog backend dapat dilihat di: ${YELLOW}backend/backend.log${NC}"
 echo -e "Log frontend dapat dilihat di: ${YELLOW}frontend/frontend.log${NC}"
 if [ "$MODE" = "local" ]; then

@@ -17,7 +17,7 @@ impl AppConfig {
         Ok(Self {
             host: std::env::var("HOST").unwrap_or_else(|_| "0.0.0.0".into()),
             port: std::env::var("PORT")
-                .unwrap_or_else(|_| "8080".into())
+                .unwrap_or_else(|_| "8081".into())
                 .parse()?,
             database_url: std::env::var("DATABASE_URL")
                 .unwrap_or_else(|_| "postgres://tiketku:tiketku@localhost:5432/tiketku".into()),

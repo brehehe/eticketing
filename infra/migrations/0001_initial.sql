@@ -301,6 +301,6 @@ CREATE INDEX idx_audit_created   ON audit_logs(created_at DESC);
 -- Password: admin123 (bcrypt cost 12)
 INSERT INTO users (name, username, email, password_hash, role, status) VALUES
     ('Administrator', 'admin', 'admin@tiketku.id',
-     '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/lewohl9VXl3WdB/GS',
+     '$2b$12$pe5rYKNa69medTPxzth//.io5bX6lMhEZGb/pkVXdag/EwhE0HVOm',
      'admin', 'active')
 ON CONFLICT (username) DO NOTHING;

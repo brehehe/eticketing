@@ -49,11 +49,11 @@ services:
       REDIS_URL: redis://redis:6379
       JWT_SECRET: change-this-in-production-use-a-long-random-string
       HOST: 0.0.0.0
-      PORT: 8080
+      PORT: 8081
       ALLOWED_ORIGINS: http://localhost:5173,http://localhost:4173
       RUST_LOG: tiketku_api=info,tower_http=warn
     ports:
-      - "8080:8080"
+      - "8081:8081"
     depends_on:
       postgres:
         condition: service_healthy
@@ -68,7 +68,7 @@ services:
     container_name: tiketku-frontend
     restart: unless-stopped
     environment:
-      VITE_API_URL: http://api:8080/api
+      VITE_API_URL: http://api:8081/api
     ports:
       - "3000:3000"
     depends_on:

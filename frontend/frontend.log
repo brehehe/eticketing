@@ -42,3 +42,4 @@ $ vite dev --host
 4:50:47 PM [vite-plugin-svelte] /Users/macbookair/Documents/website/burningroom/e-ticketing/frontend/src/lib/components/print/PrintModal.svelte:807:2 Unused CSS selector "[data-theme="dark"] .preview-row.sm-details"
 4:50:53 PM [vite-plugin-svelte] /Users/macbookair/Documents/website/burningroom/e-ticketing/frontend/src/lib/components/layout/Topbar.svelte:34:23 A11y: Redundant role 'banner'
 4:50:53 PM [vite-plugin-svelte] /Users/macbookair/Documents/website/burningroom/e-ticketing/frontend/src/lib/components/layout/Sidebar.svelte:172:2 Unused CSS selector "[data-theme='dark'] .nav-item.active"
+error: script "dev" was terminated by signal SIGHUP (Terminal hung up)

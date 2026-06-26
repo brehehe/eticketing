@@ -4,6 +4,7 @@ use axum::{
     routing::get,
     Extension,
 };
+use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
@@ -300,6 +301,7 @@ async fn investor_report(
 async fn dashboard_stats(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
+    Query(q): Query<ReportQuery>,
 ) -> AppResult<Json<serde_json::Value>> {
     let investor_id: Option<Uuid> = if auth.role == "investor" {
         sqlx::query_scalar("SELECT id FROM investors WHERE user_id = $1")
@@ -310,25 +312,35 @@ async fn dashboard_stats(
         None
     };
 
+    let from = q.from.clone().unwrap_or_else(|| "today".to_string());
+    let to = q.to.clone().unwrap_or_else(|| "today".to_string());
+
     let cache_key = if let Some(iid) = investor_id {
-        format!("dashboard:stats:investor:{}", iid)
+        format!("dashboard:stats:investor:{}:{}:{}", iid, from, to)
     } else {
-        "dashboard:stats:admin".to_string()
+        format!("dashboard:stats:admin:{}:{}", from, to)
     };
 
     if let Some(cached) = state.cache.get::<serde_json::Value>(&cache_key).await {
         return Ok(Json(cached));
     }
 
+    let sql_from: Option<NaiveDate> = if from == "today" { None } else { NaiveDate::parse_from_str(&from, "%Y-%m-%d").ok() };
+    let sql_to: Option<NaiveDate> = if to == "today" { None } else { NaiveDate::parse_from_str(&to, "%Y-%m-%d").ok() };
+
     let today_revenue: Option<i64> = sqlx::query_scalar(
         "SELECT COALESCE(SUM(ti.subtotal), 0)::bigint \
          FROM transaction_items ti \
          JOIN transactions t ON t.id = ti.transaction_id \
          JOIN products p ON p.id = ti.product_id \
-         WHERE DATE(t.created_at) = CURRENT_DATE AND t.status = 'paid' \
-           AND ($1::uuid IS NULL OR p.investor_id = $1)"
+         WHERE t.status = 'paid' \
+           AND ($1::uuid IS NULL OR p.investor_id = $1) \
+           AND ($2::date IS NULL AND DATE(t.created_at) = CURRENT_DATE OR $2::date IS NOT NULL AND DATE(t.created_at) >= $2::date) \
+           AND ($3::date IS NULL AND DATE(t.created_at) = CURRENT_DATE OR $3::date IS NOT NULL AND DATE(t.created_at) <= $3::date)"
     )
     .bind(investor_id)
+    .bind(sql_from.as_ref())
+    .bind(sql_to.as_ref())
     .fetch_one(&state.db.pool)
     .await?;
 
@@ -336,10 +348,13 @@ async fn dashboard_stats(
         "SELECT COUNT(*)::bigint \
          FROM tickets tk \
          JOIN products p ON p.id = tk.product_id \
-         WHERE DATE(tk.created_at) = CURRENT_DATE \
-           AND ($1::uuid IS NULL OR p.investor_id = $1)"
+         WHERE ($1::uuid IS NULL OR p.investor_id = $1) \
+           AND ($2::date IS NULL AND DATE(tk.created_at) = CURRENT_DATE OR $2::date IS NOT NULL AND DATE(tk.created_at) >= $2::date) \
+           AND ($3::date IS NULL AND DATE(tk.created_at) = CURRENT_DATE OR $3::date IS NOT NULL AND DATE(tk.created_at) <= $3::date)"
     )
     .bind(investor_id)
+    .bind(sql_from.as_ref())
+    .bind(sql_to.as_ref())
     .fetch_one(&state.db.pool)
     .await?;
 
@@ -348,46 +363,82 @@ async fn dashboard_stats(
          FROM transactions t \
          JOIN transaction_items ti ON ti.transaction_id = t.id \
          JOIN products p ON p.id = ti.product_id \
-         WHERE DATE(t.created_at) = CURRENT_DATE AND t.status = 'paid' \
-           AND ($1::uuid IS NULL OR p.investor_id = $1)"
+         WHERE t.status = 'paid' \
+           AND ($1::uuid IS NULL OR p.investor_id = $1) \
+           AND ($2::date IS NULL AND DATE(t.created_at) = CURRENT_DATE OR $2::date IS NOT NULL AND DATE(t.created_at) >= $2::date) \
+           AND ($3::date IS NULL AND DATE(t.created_at) = CURRENT_DATE OR $3::date IS NOT NULL AND DATE(t.created_at) <= $3::date)"
     )
     .bind(investor_id)
+    .bind(sql_from.as_ref())
+    .bind(sql_to.as_ref())
     .fetch_one(&state.db.pool)
     .await?;
 
-    let hourly = sqlx::query!(
-        r#"SELECT
-             EXTRACT(HOUR FROM t.created_at)::int  AS "hour!",
-             COALESCE(SUM(ti.subtotal)::bigint, 0)     AS "revenue!"
-           FROM transactions t
-           JOIN transaction_items ti ON ti.transaction_id = t.id
-           JOIN products p ON p.id = ti.product_id
-           WHERE DATE(t.created_at) = CURRENT_DATE AND t.status = 'paid'
-             AND ($1::uuid IS NULL OR p.investor_id = $1)
-           GROUP BY EXTRACT(HOUR FROM t.created_at)
-           ORDER BY EXTRACT(HOUR FROM t.created_at)"#,
-        investor_id
-    )
-    .fetch_all(&state.db.pool)
-    .await?;
+    let is_multiday = if let (Some(f), Some(t)) = (&sql_from, &sql_to) {
+        f != t
+    } else {
+        false
+    };
 
-    let hourly_data: Vec<HourlyRow> = hourly.into_iter().map(|r| HourlyRow {
-        hour: format!("{:02}", r.hour),
-        revenue: r.revenue,
-    }).collect();
+    let sales_chart: Vec<serde_json::Value> = if is_multiday {
+        let daily = sqlx::query!(
+            r#"SELECT
+                 TO_CHAR(d, 'DD/MM')    AS "date!",
+                 COALESCE(SUM(ti.subtotal)::bigint, 0) AS "revenue!"
+               FROM GENERATE_SERIES($2::date, $3::date, '1 day'::interval) d
+               LEFT JOIN transactions t ON DATE(t.created_at) = DATE(d) AND t.status = 'paid'
+               LEFT JOIN transaction_items ti ON ti.transaction_id = t.id
+               LEFT JOIN products p ON p.id = ti.product_id AND ($1::uuid IS NULL OR p.investor_id = $1)
+               GROUP BY d
+               ORDER BY d"#,
+            investor_id,
+            sql_from,
+            sql_to
+        )
+        .fetch_all(&state.db.pool)
+        .await?;
 
-    // Query weekly revenue (last 7 days including today)
+        daily.into_iter().map(|r| json!({
+            "date": r.date,
+            "revenue": r.revenue,
+        })).collect()
+    } else {
+        let hourly = sqlx::query!(
+            r#"SELECT
+                 EXTRACT(HOUR FROM t.created_at)::int  AS "hour!",
+                 COALESCE(SUM(ti.subtotal)::bigint, 0)     AS "revenue!"
+               FROM transactions t
+               JOIN transaction_items ti ON ti.transaction_id = t.id
+               JOIN products p ON p.id = ti.product_id
+               WHERE t.status = 'paid'
+                 AND ($1::uuid IS NULL OR p.investor_id = $1)
+                 AND ($2::date IS NULL AND DATE(t.created_at) = CURRENT_DATE OR $2::date IS NOT NULL AND DATE(t.created_at) = $2::date)
+               GROUP BY EXTRACT(HOUR FROM t.created_at)
+               ORDER BY EXTRACT(HOUR FROM t.created_at)"#,
+            investor_id,
+            sql_from
+        )
+        .fetch_all(&state.db.pool)
+        .await?;
+
+        hourly.into_iter().map(|r| json!({
+            "hour": format!("{:02}", r.hour),
+            "revenue": r.revenue,
+        })).collect()
+    };
+
     let weekly = sqlx::query!(
         r#"SELECT
              TO_CHAR(d, 'Dy')                  AS "date!",
              COALESCE(SUM(ti.subtotal)::bigint, 0) AS "revenue!"
-           FROM GENERATE_SERIES(CURRENT_DATE - INTERVAL '6 days', CURRENT_DATE, '1 day'::interval) d
+           FROM GENERATE_SERIES(COALESCE($2::date, CURRENT_DATE) - INTERVAL '6 days', COALESCE($2::date, CURRENT_DATE), '1 day'::interval) d
            LEFT JOIN transactions t ON DATE(t.created_at) = DATE(d) AND t.status = 'paid'
            LEFT JOIN transaction_items ti ON ti.transaction_id = t.id
            LEFT JOIN products p ON p.id = ti.product_id AND ($1::uuid IS NULL OR p.investor_id = $1)
            GROUP BY d
            ORDER BY d"#,
-        investor_id
+        investor_id,
+        sql_to
     )
     .fetch_all(&state.db.pool)
     .await?;
@@ -397,18 +448,21 @@ async fn dashboard_stats(
         revenue: r.revenue,
     }).collect();
 
-    // Query today's best selling product
     let top_product: Option<String> = sqlx::query_scalar(
         r#"SELECT p.name FROM transaction_items ti
            JOIN products p ON p.id = ti.product_id
            JOIN transactions t ON t.id = ti.transaction_id
-           WHERE DATE(t.created_at) = CURRENT_DATE AND t.status = 'paid'
+           WHERE t.status = 'paid'
              AND ($1::uuid IS NULL OR p.investor_id = $1)
+             AND ($2::date IS NULL AND DATE(t.created_at) = CURRENT_DATE OR $2::date IS NOT NULL AND DATE(t.created_at) >= $2::date)
+             AND ($3::date IS NULL AND DATE(t.created_at) = CURRENT_DATE OR $3::date IS NOT NULL AND DATE(t.created_at) <= $3::date)
            GROUP BY p.id, p.name
            ORDER BY SUM(ti.qty) DESC
            LIMIT 1"#
     )
     .bind(investor_id)
+    .bind(sql_from.as_ref())
+    .bind(sql_to.as_ref())
     .fetch_optional(&state.db.pool)
     .await?;
 
@@ -418,10 +472,14 @@ async fn dashboard_stats(
            JOIN transactions t ON t.id = ti.transaction_id
            JOIN products pr ON pr.id = ti.product_id
            LEFT JOIN product_variants pv ON pv.id = ti.variant_id
-           WHERE DATE(t.created_at) = CURRENT_DATE AND t.status = 'paid'
-             AND ($1::uuid IS NULL OR pr.investor_id = $1)"#
+           WHERE t.status = 'paid'
+             AND ($1::uuid IS NULL OR pr.investor_id = $1)
+             AND ($2::date IS NULL AND DATE(t.created_at) = CURRENT_DATE OR $2::date IS NOT NULL AND DATE(t.created_at) >= $2::date)
+             AND ($3::date IS NULL AND DATE(t.created_at) = CURRENT_DATE OR $3::date IS NOT NULL AND DATE(t.created_at) <= $3::date)"#
     )
     .bind(investor_id)
+    .bind(sql_from.as_ref())
+    .bind(sql_to.as_ref())
     .fetch_one(&state.db.pool)
     .await?;
 
@@ -433,7 +491,7 @@ async fn dashboard_stats(
             "sales_today":    today_revenue.unwrap_or(0),
             "visitors_today": tx_today.unwrap_or(0),
             "top_product":    top_product.unwrap_or_else(|| "-".to_string()),
-            "sales_chart":    hourly_data,
+            "sales_chart":    sales_chart,
             "revenue_chart":  weekly_data,
             "investor_revenue": investor_revenue.unwrap_or(0),
         }

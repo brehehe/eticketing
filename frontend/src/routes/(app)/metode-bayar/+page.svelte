@@ -253,7 +253,7 @@
 </Modal>
 
 <style>
-  .page { display:flex;flex-direction:column;gap:20px;max-width:800px; }
+  .page { display:flex;flex-direction:column;gap:20px;max-width:1400px; }
   .page-header { display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px; }
   .page-header h1 { font-size:1.5rem;font-weight:700;letter-spacing:-0.025em; }
   .methods-list { display:flex;flex-direction:column;gap:10px; }

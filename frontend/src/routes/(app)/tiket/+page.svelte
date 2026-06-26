@@ -176,7 +176,7 @@
 </div>
 
 <style>
-  .scan-page { display:grid; grid-template-columns:1fr 1fr; gap:20px; max-width:1000px; align-items:start; }
+  .scan-page { display:grid; grid-template-columns:1fr 1fr; gap:20px; max-width:1400px; align-items:start; }
   .scan-panel { overflow:hidden; }
   .scan-header { display:flex;align-items:flex-start;justify-content:space-between;padding:20px 20px 16px;border-bottom:1px solid var(--border); }
   .scan-header h2 { font-size:1.125rem; }

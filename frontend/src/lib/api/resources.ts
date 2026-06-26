@@ -6,7 +6,10 @@ import type {
 
 // ── Dashboard --------------------------------------------------
 export const dashboardApi = {
-  stats: () => api.get<DashboardStats>('/reports/dashboard'),
+  stats: (params?: Record<string, string>) => {
+    const q = params ? '?' + new URLSearchParams(params).toString() : '';
+    return api.get<DashboardStats>(`/reports/dashboard${q}`);
+  },
 };
 
 // ── Categories -------------------------------------------------
@@ -27,6 +30,7 @@ export const usersApi = {
   create: (body: unknown) => api.post<User>('/users', body),
   update: (id: string, body: unknown) => api.put<User>(`/users/${id}`, body),
   delete: (id: string) => api.delete<null>(`/users/${id}`),
+  roleCounts: () => api.get<Record<string, number>>('/users/role-counts'),
 };
 
 // ── Investors -------------------------------------------------

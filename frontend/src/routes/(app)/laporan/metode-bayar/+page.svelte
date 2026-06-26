@@ -2,10 +2,11 @@
   export let data: any = {};
   export let form: any = undefined;
   import { onMount, afterUpdate } from 'svelte';
-  import { currency } from '$lib/utils/format';
+  import { currency, date } from '$lib/utils/format';
   import { api } from '$lib/api/client';
   import { toast } from '$lib/stores/toast';
   import { CreditCard, Download, Calendar, Filter } from 'lucide-svelte';
+  import { exportToExcel, exportToPDF } from '$lib/utils/export';
 
   let loading = true;
   let dateFrom = new Date(Date.now() - 30 * 86400000).toISOString().slice(0,10);
@@ -89,6 +90,39 @@
     cash: 'Tunai', qris: 'QRIS', transfer: 'Transfer',
     debit: 'Debit', ewallet: 'E-Wallet',
   };
+
+  function handleExportExcel() {
+    const headers = ['Metode Pembayaran', 'Transaksi', 'Total Pendapatan', 'Persentase'];
+    const rows = reportData.map(row => {
+      const pct = totalRevenue > 0 ? ((row.total_amount / totalRevenue) * 100).toFixed(1) : '0';
+      return [
+        methodNames[row.method] ?? row.method,
+        row.transaction_count ?? 0,
+        row.total_amount ?? 0,
+        `${pct}%`
+      ];
+    });
+    exportToExcel(headers, rows, `laporan_metode_bayar_${dateFrom}_to_${dateTo}`);
+  }
+
+  function handleExportPDF() {
+    const headers = ['Metode Pembayaran', 'Transaksi', 'Total Pendapatan', 'Persentase'];
+    const rows = reportData.map(row => {
+      const pct = totalRevenue > 0 ? ((row.total_amount / totalRevenue) * 100).toFixed(1) : '0';
+      return [
+        methodNames[row.method] ?? row.method,
+        row.transaction_count ?? 0,
+        currency(row.total_amount ?? 0),
+        `${pct}%`
+      ];
+    });
+    const stats = [
+      { label: 'Total Transaksi', value: String(totalTx) },
+      { label: 'Total Revenue', value: currency(totalRevenue) },
+      { label: 'Metode Digunakan', value: String(reportData.length) }
+    ];
+    exportToPDF('Laporan Metode Pembayaran', `${date(dateFrom)} - ${date(dateTo)}`, stats, headers, rows);
+  }
 </script>
 
 <svelte:head><title>Laporan Metode Bayar — TiketKu</title></svelte:head>
@@ -99,7 +133,10 @@
       <h1>Laporan Metode Pembayaran</h1>
       <p style="color:var(--text-2);font-size:0.875rem;margin-top:2px;">Distribusi metode bayar yang digunakan</p>
     </div>
-    <button class="btn btn-secondary" style="gap:6px;"><Download size={14} /> Export</button>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-secondary" style="gap:6px;" on:click={handleExportExcel}><Download size={14} /> Export Excel</button>
+      <button class="btn btn-secondary" style="gap:6px;" on:click={handleExportPDF}><Download size={14} /> Export PDF</button>
+    </div>
   </div>
 
   <div class="card" style="padding:14px 18px;">
@@ -167,7 +204,7 @@
 </div>
 
 <style>
-  .page { display:flex;flex-direction:column;gap:20px;max-width:1000px; }
+  .page { display:flex;flex-direction:column;gap:20px;max-width:1400px; }
   .page-header { display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px; }
   .page-header h1 { font-size:1.5rem;font-weight:700;letter-spacing:-0.025em; }
   .stats-row { display:grid;grid-template-columns:repeat(3,1fr);gap:14px; }

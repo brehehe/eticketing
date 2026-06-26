@@ -22,34 +22,116 @@
   let chart: any;
   let ChartClass: any = null;
   let debugError: string | null = null;
+  let filterRange = 'today';
+  let customFrom = '';
+  let customTo = '';
+
+  function getDateParams() {
+    const params: Record<string, string> = {};
+    const tzOffset = new Date().getTimezoneOffset() * 60000;
+    const getLocalDateString = (d: Date) => new Date(d.getTime() - tzOffset).toISOString().split('T')[0];
+
+    const today = new Date();
+    
+    if (filterRange === 'today') {
+      params.from = getLocalDateString(today);
+      params.to = getLocalDateString(today);
+    } else if (filterRange === 'yesterday') {
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      params.from = getLocalDateString(yesterday);
+      params.to = getLocalDateString(yesterday);
+    } else if (filterRange === 'last7') {
+      const start = new Date();
+      start.setDate(start.getDate() - 6);
+      params.from = getLocalDateString(start);
+      params.to = getLocalDateString(today);
+    } else if (filterRange === 'last30') {
+      const start = new Date();
+      start.setDate(start.getDate() - 29);
+      params.from = getLocalDateString(start);
+      params.to = getLocalDateString(today);
+    } else if (filterRange === 'thisMonth') {
+      const start = new Date(today.getFullYear(), today.getMonth(), 1);
+      params.from = getLocalDateString(start);
+      params.to = getLocalDateString(today);
+    } else if (filterRange === 'thisYear') {
+      const start = new Date(today.getFullYear(), 0, 1);
+      params.from = getLocalDateString(start);
+      params.to = getLocalDateString(today);
+    } else if (filterRange === 'custom') {
+      if (customFrom) params.from = customFrom;
+      if (customTo) params.to = customTo;
+    }
+    return params;
+  }
 
   async function loadData() {
     loading = true;
     try {
+      const dateParams = getDateParams();
       const [statsRes, txRes] = await Promise.all([
-        dashboardApi.stats(),
-        transactionsApi.list({ per_page: '5' }),
+        dashboardApi.stats(dateParams),
+        transactionsApi.list({ per_page: '5', ...dateParams }),
       ]);
       const statsData = (statsRes as any)?.data ?? {};
       const txData    = (txRes as any)?.data;
       recentTx = Array.isArray(txData) ? txData : [];
 
-      // Demo chart data — shown when API has no real data yet
-      const demoSalesChart = [
-        {hour:'08',revenue:450000},{hour:'09',revenue:980000},{hour:'10',revenue:1200000},
-        {hour:'11',revenue:1800000},{hour:'12',revenue:2100000},{hour:'13',revenue:2450000},
-        {hour:'14',revenue:1950000},{hour:'15',revenue:1350000},{hour:'16',revenue:870000},
-      ];
-      const demoRevenueChart = [
-        {date:'Sen',revenue:9200000},{date:'Sel',revenue:11400000},{date:'Rab',revenue:8700000},
-        {date:'Kam',revenue:13100000},{date:'Jum',revenue:15600000},
-        {date:'Sab',revenue:18900000},{date:'Min',revenue:14200000},
-      ];
+      let apiSalesChart: any[] = [];
+      const monthNamesShort = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'];
 
-      const apiSalesChart = Array.isArray(statsData.sales_chart) && statsData.sales_chart.length > 0
-        ? statsData.sales_chart : demoSalesChart;
-      const apiRevenueChart = Array.isArray(statsData.revenue_chart) && statsData.revenue_chart.length > 0
-        ? statsData.revenue_chart : demoRevenueChart;
+      if (Array.isArray(statsData.sales_chart) && statsData.sales_chart.length > 0) {
+        if (filterRange === 'thisYear') {
+          // Aggregate daily data by month index
+          const monthlyGroups: Record<number, number> = {};
+          for (let m = 0; m < 12; m++) {
+            monthlyGroups[m] = 0;
+          }
+          statsData.sales_chart.forEach((item: any) => {
+            if (!item.date) return;
+            const parts = item.date.split('/');
+            if (parts.length === 2) {
+              const monthIdx = parseInt(parts[1], 10) - 1;
+              if (monthIdx >= 0 && monthIdx < 12) {
+                monthlyGroups[monthIdx] += item.revenue ?? 0;
+              }
+            }
+          });
+          apiSalesChart = monthNamesShort.map((name, idx) => ({
+            date: name,
+            revenue: monthlyGroups[idx]
+          }));
+        } else {
+          apiSalesChart = statsData.sales_chart;
+        }
+      } else {
+        // Fallback to real-time zeroed chart data representation instead of placeholders
+        if (filterRange === 'today' || filterRange === 'yesterday') {
+          const hours = ['08', '09', '10', '11', '12', '13', '14', '15', '16', '17', '18'];
+          apiSalesChart = hours.map(h => ({ hour: h, revenue: 0 }));
+        } else if (filterRange === 'thisYear') {
+          apiSalesChart = monthNamesShort.map(name => ({ date: name, revenue: 0 }));
+        } else {
+          const params = getDateParams();
+          const start = params.from ? new Date(params.from) : new Date();
+          const end = params.to ? new Date(params.to) : new Date();
+          const dateList = [];
+          for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+            const label = String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0');
+            dateList.push({ date: label, revenue: 0 });
+          }
+          apiSalesChart = dateList;
+        }
+      }
+
+      let apiRevenueChart: any[] = [];
+      if (Array.isArray(statsData.revenue_chart) && statsData.revenue_chart.length > 0) {
+        apiRevenueChart = statsData.revenue_chart;
+      } else {
+        const days = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
+        apiRevenueChart = days.map(d => ({ date: d, revenue: 0 }));
+      }
 
       stats = {
         sales_today:      statsData.sales_today      ?? 0,
@@ -68,28 +150,38 @@
     } catch (e: any) {
       console.error('loadData error:', e);
       debugError = 'loadData error: ' + (e.stack || e.message);
-      // Fallback to full demo data if API fails
+      // Zeroed-out fallback stats
+      const monthNamesShort = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'];
+      let apiSalesChart = [];
+      if (filterRange === 'today' || filterRange === 'yesterday') {
+        const hours = ['08', '09', '10', '11', '12', '13', '14', '15', '16', '17', '18'];
+        apiSalesChart = hours.map(h => ({ hour: h, revenue: 0 }));
+      } else if (filterRange === 'thisYear') {
+        apiSalesChart = monthNamesShort.map(name => ({ date: name, revenue: 0 }));
+      } else {
+        const params = getDateParams();
+        const start = params.from ? new Date(params.from) : new Date();
+        const end = params.to ? new Date(params.to) : new Date();
+        const dateList = [];
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+          const label = String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0');
+          dateList.push({ date: label, revenue: 0 });
+        }
+        apiSalesChart = dateList;
+      }
+
       stats = {
         sales_today: 0, visitors_today: 0, tickets_sold: 0,
         top_product: '-', revenue_today: 0,
         printer_status: 'disconnected', bluetooth_status: 'disconnected',
         scan_status: 'online', investor_revenue: 0, peak_hour: 'N/A',
-        sales_chart: [
-          {hour:'08',revenue:450000},{hour:'09',revenue:980000},{hour:'10',revenue:1200000},
-          {hour:'11',revenue:1800000},{hour:'12',revenue:2100000},{hour:'13',revenue:2450000},
-          {hour:'14',revenue:1950000},{hour:'15',revenue:1350000},{hour:'16',revenue:870000},
-        ],
-        revenue_chart: [
-          {date:'Sen',revenue:9200000},{date:'Sel',revenue:11400000},{date:'Rab',revenue:8700000},
-          {date:'Kam',revenue:13100000},{date:'Jum',revenue:15600000},
-          {date:'Sab',revenue:18900000},{date:'Min',revenue:14200000},
-        ],
+        sales_chart: apiSalesChart,
+        revenue_chart: ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'].map(d => ({ date: d, revenue: 0 })),
       };
       recentTx = [];
     } finally {
       loading = false;
     }
-    // Defer initialization to ensure Svelte has mounted the canvas element
     setTimeout(initChart, 100);
   }
 
@@ -132,7 +224,7 @@
       chart = new ChartClass(chartCanvas, {
         type: 'bar',
         data: {
-          labels: stats.sales_chart.map((d: any) => (d.hour ?? d.date ?? '') + (d.hour ? ':00' : '')),
+          labels: stats.sales_chart.map((d: any) => d.hour ? d.hour + ':00' : d.date ?? ''),
           datasets: [{
             label: 'Pendapatan',
             data: stats.sales_chart.map((d: any) => d.revenue ?? 0),
@@ -173,6 +265,57 @@
     { label:'Print Ulang',   icon: Printer, href:'/kasir',       color:'var(--amber)' },
     { label:'Tambah Produk', icon: Plus,    href:'/produk',      color:'var(--violet)' },
   ];
+
+  // Dynamic titles mapping for stats cards
+  $: revenueLabel = filterRange === 'today' ? 'Pendapatan Hari Ini'
+                  : filterRange === 'yesterday' ? 'Pendapatan Kemarin'
+                  : filterRange === 'last7' ? 'Pendapatan 7 Hari Terakhir'
+                  : filterRange === 'last30' ? 'Pendapatan 30 Hari Terakhir'
+                  : filterRange === 'thisMonth' ? 'Pendapatan Bulan Ini'
+                  : filterRange === 'thisYear' ? 'Pendapatan Tahun Ini'
+                  : 'Pendapatan Periode Terpilih';
+
+  $: ticketsLabel = filterRange === 'today' ? 'Tiket Terjual'
+                  : filterRange === 'yesterday' ? 'Tiket Terjual Kemarin'
+                  : filterRange === 'last7' ? 'Tiket Terjual (7 Hari)'
+                  : filterRange === 'last30' ? 'Tiket Terjual (30 Hari)'
+                  : filterRange === 'thisMonth' ? 'Tiket Terjual Bulan Ini'
+                  : filterRange === 'thisYear' ? 'Tiket Terjual Tahun Ini'
+                  : 'Tiket Terjual';
+
+  $: salesLabel = filterRange === 'today' ? 'Total Penjualan'
+                : filterRange === 'yesterday' ? 'Total Penjualan Kemarin'
+                : filterRange === 'last7' ? 'Total Penjualan (7 Hari)'
+                : filterRange === 'last30' ? 'Total Penjualan (30 Hari)'
+                : filterRange === 'thisMonth' ? 'Total Penjualan Bulan Ini'
+                : filterRange === 'thisYear' ? 'Total Penjualan Tahun Ini'
+                : 'Total Penjualan';
+
+  $: investorLabel = filterRange === 'today' ? 'Revenue Investor'
+                   : filterRange === 'yesterday' ? 'Revenue Investor Kemarin'
+                   : filterRange === 'last7' ? 'Revenue Investor (7 Hari)'
+                   : filterRange === 'last30' ? 'Revenue Investor (30 Hari)'
+                   : filterRange === 'thisMonth' ? 'Revenue Investor Bulan Ini'
+                   : filterRange === 'thisYear' ? 'Revenue Investor Tahun Ini'
+                   : 'Revenue Investor';
+
+  $: cardSub = filterRange === 'today' ? 'Hari ini'
+             : filterRange === 'yesterday' ? 'Kemarin'
+             : filterRange === 'last7' ? '7 hari terakhir'
+             : filterRange === 'last30' ? '30 hari terakhir'
+             : filterRange === 'thisMonth' ? 'Bulan ini'
+             : filterRange === 'thisYear' ? 'Tahun ini'
+             : 'Periode terpilih';
+
+  $: chartTitle = filterRange === 'today' || filterRange === 'yesterday' ? 'Penjualan per Jam'
+                : filterRange === 'thisYear' ? 'Penjualan per Bulan'
+                : 'Penjualan Harian';
+
+  $: totalRevenue = stats?.sales_chart?.reduce((s: number, d: any) => s + (d.revenue ?? 0), 0) ?? 0;
+
+  $: chartSubtitle = filterRange === 'today' || filterRange === 'yesterday'
+    ? `Hari ini — Peak: ${stats?.peak_hour ?? 'N/A'}`
+    : `Periode ini — Total: ${currency(totalRevenue)}`;
 </script>
 
 <svelte:head><title>Dashboard — TiketKu</title></svelte:head>
@@ -186,9 +329,43 @@
   <div class="page-header">
     <div>
       <h1>Dashboard</h1>
-      <p style="color:var(--text-2);margin-top:2px;font-size:0.875rem;">Ringkasan operasional hari ini</p>
+      <p style="color:var(--text-2);margin-top:2px;font-size:0.875rem;">
+        {#if filterRange === 'today'}
+          Ringkasan operasional hari ini
+        {:else if filterRange === 'yesterday'}
+          Ringkasan operasional kemarin
+        {:else if filterRange === 'last7'}
+          Ringkasan operasional 7 hari terakhir
+        {:else if filterRange === 'last30'}
+          Ringkasan operasional 30 hari terakhir
+        {:else if filterRange === 'thisMonth'}
+          Ringkasan operasional bulan ini
+        {:else if filterRange === 'thisYear'}
+          Ringkasan operasional tahun ini
+        {:else}
+          Ringkasan operasional kustom
+        {/if}
+      </p>
     </div>
-    <div style="display:flex;gap:8px;align-items:center;">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <select class="input input-sm" style="width:160px;padding:4px 8px;font-size:0.8125rem;" bind:value={filterRange} on:change={loadData}>
+        <option value="today">Hari Ini (Harian)</option>
+        <option value="yesterday">Kemarin</option>
+        <option value="last7">7 Hari Terakhir</option>
+        <option value="last30">30 Hari Terakhir</option>
+        <option value="thisMonth">Bulan Ini (Bulanan)</option>
+        <option value="thisYear">Tahun Ini (Tahunan)</option>
+        <option value="custom">Kustom Tanggal...</option>
+      </select>
+
+      {#if filterRange === 'custom'}
+        <div style="display:flex;gap:4px;align-items:center;">
+          <input type="date" class="input input-sm" style="width:130px;padding:4px 8px;font-size:0.8125rem;" bind:value={customFrom} on:change={loadData} />
+          <span style="font-size:0.8125rem;color:var(--text-3);">s/d</span>
+          <input type="date" class="input input-sm" style="width:130px;padding:4px 8px;font-size:0.8125rem;" bind:value={customTo} on:change={loadData} />
+        </div>
+      {/if}
+
       <div class="system-status">
         <span class="dot {$btState === 'connected' ? 'dot-success' : 'dot-danger'} dot-pulse"></span>
         <span style="font-size:0.8125rem;color:var(--text-2);">
@@ -203,10 +380,10 @@
   </div>
 
   <div class="stats-grid fade-in">
-    <StatCard label="Pendapatan Hari Ini" value={loading ? '...' : currency(stats?.revenue_today ?? 0)} sub="Total semua metode" trend={8.4} color="var(--brand-500)" {loading} />
-    <StatCard label="Tiket Terjual"        value={loading ? '...' : number(stats?.tickets_sold ?? 0)} sub="Hari ini" trend={12.1} color="var(--emerald)" {loading} />
-    <StatCard label="Total Penjualan"      value={loading ? '...' : currency(stats?.sales_today ?? 0)} sub="Setelah diskon" trend={-2.3} color="var(--amber)" {loading} />
-    <StatCard label="Revenue Investor"     value={loading ? '...' : currency(stats?.investor_revenue ?? 0)} sub="Share produk" trend={5.7} color="var(--violet)" {loading} />
+    <StatCard label={revenueLabel} value={loading ? '...' : currency(stats?.revenue_today ?? 0)} sub={cardSub} trend={8.4} color="var(--brand-500)" {loading} />
+    <StatCard label={ticketsLabel}  value={loading ? '...' : number(stats?.tickets_sold ?? 0)} sub={cardSub} trend={12.1} color="var(--emerald)" {loading} />
+    <StatCard label={salesLabel}    value={loading ? '...' : currency(stats?.sales_today ?? 0)} sub={cardSub} trend={-2.3} color="var(--amber)" {loading} />
+    <StatCard label={investorLabel} value={loading ? '...' : currency(stats?.investor_revenue ?? 0)} sub={cardSub} trend={5.7} color="var(--violet)" {loading} />
   </div>
 
   <div class="quick-actions fade-in-1">
@@ -225,8 +402,8 @@
     <div class="card chart-card fade-in-2">
       <div class="card-header">
         <div>
-          <h3>Penjualan per Jam</h3>
-          <p style="font-size:0.8125rem;color:var(--text-2);margin-top:2px;">Hari ini &mdash; Peak: {stats?.peak_hour ?? '--'}</p>
+          <h3>{chartTitle}</h3>
+          <p style="font-size:0.8125rem;color:var(--text-2);margin-top:2px;">{chartSubtitle}</p>
         </div>
         <Activity size={18} style="color:var(--text-3)" />
       </div>
@@ -234,7 +411,7 @@
         {#if loading}
           <div class="skel" style="width:100%;height:100%;"></div>
         {:else if !stats?.sales_chart?.length}
-          <div style="height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-3);font-size:0.875rem;">Belum ada data hari ini</div>
+          <div style="height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-3);font-size:0.875rem;">Belum ada data untuk periode ini</div>
         {:else}
           <canvas bind:this={chartCanvas}></canvas>
         {/if}
@@ -289,7 +466,7 @@
           <div class="tp-icon"><Ticket size={24} style="color:var(--brand-500)" /></div>
           <div>
             <p style="font-weight:600;">{stats?.top_product ?? '-'}</p>
-            <p style="font-size:0.8125rem;color:var(--text-2);margin-top:2px;">{number(stats?.tickets_sold ?? 0)} tiket terjual hari ini</p>
+            <p style="font-size:0.8125rem;color:var(--text-2);margin-top:2px;">{number(stats?.tickets_sold ?? 0)} tiket terjual pada periode ini</p>
           </div>
         </div>
       {/if}

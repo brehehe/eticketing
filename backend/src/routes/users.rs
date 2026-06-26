@@ -26,8 +26,9 @@ pub struct ListQuery {
 
 pub fn router() -> Router<AppState> {
     Router::new()
-        .route("/",    get(list_users).post(create_user))
-        .route("/:id", get(get_user).put(update_user).delete(delete_user))
+        .route("/",            get(list_users).post(create_user))
+        .route("/role-counts", get(get_role_counts))
+        .route("/:id",         get(get_user).put(update_user).delete(delete_user))
 }
 
 async fn list_users(
@@ -47,11 +48,17 @@ async fn list_users(
     let search_pattern = format!("%{}%", search);
 
     let users = sqlx::query_as::<_, User>(
-        r#"SELECT * FROM users
-           WHERE ($1 = '' OR name ILIKE $1 OR username ILIKE $1 OR email ILIKE $1)
-             AND ($2 IS NULL OR role = $2)
-             AND ($3 IS NULL OR status = $3)
-           ORDER BY created_at DESC
+        r#"SELECT u.*, COALESCE(d.device_count, 0) as device_count
+           FROM users u
+           LEFT JOIN (
+               SELECT user_id, COUNT(*) as device_count
+               FROM user_devices
+               GROUP BY user_id
+           ) d ON u.id = d.user_id
+           WHERE ($1 = '' OR u.name ILIKE $1 OR u.username ILIKE $1 OR u.email ILIKE $1)
+             AND ($2 IS NULL OR u.role = $2)
+             AND ($3 IS NULL OR u.status = $3)
+           ORDER BY u.created_at DESC
            LIMIT $4 OFFSET $5"#
     )
     .bind(&search_pattern)
@@ -90,7 +97,16 @@ async fn get_user(
         return Err(AppError::Forbidden("Akses ditolak".into()));
     }
 
-    let user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE id = $1")
+    let user = sqlx::query_as::<_, User>(
+        r#"SELECT u.*, COALESCE(d.device_count, 0) as device_count
+           FROM users u
+           LEFT JOIN (
+               SELECT user_id, COUNT(*) as device_count
+               FROM user_devices
+               GROUP BY user_id
+           ) d ON u.id = d.user_id
+           WHERE u.id = $1"#
+    )
         .bind(id)
         .fetch_optional(&state.db.pool)
         .await?
@@ -125,9 +141,13 @@ async fn create_user(
         .map_err(|e| AppError::Internal(e.into()))?;
 
     let user = sqlx::query_as::<_, User>(
-        r#"INSERT INTO users (id, name, username, email, password_hash, role, status)
-           VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6)
-           RETURNING *"#
+        r#"WITH inserted AS (
+               INSERT INTO users (id, name, username, email, password_hash, role, status)
+               VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6)
+               RETURNING *
+           )
+           SELECT u.*, 0::BIGINT as device_count
+           FROM inserted u"#
     )
     .bind(&req.name)
     .bind(&req.username)
@@ -165,14 +185,23 @@ async fn update_user(
     } else { None };
 
     let user = sqlx::query_as::<_, User>(
-        r#"UPDATE users SET
-             name         = COALESCE($1, name),
-             email        = COALESCE($2, email),
-             password_hash= COALESCE($3, password_hash),
-             role         = COALESCE($4, role),
-             status       = COALESCE($5, status),
-             updated_at   = NOW()
-           WHERE id = $6 RETURNING *"#
+        r#"WITH updated AS (
+               UPDATE users SET
+                 name         = COALESCE($1, name),
+                 email        = COALESCE($2, email),
+                 password_hash= COALESCE($3, password_hash),
+                 role         = COALESCE($4, role),
+                 status       = COALESCE($5, status),
+                 updated_at   = NOW()
+               WHERE id = $6 RETURNING *
+           )
+           SELECT u.*, COALESCE(d.device_count, 0) as device_count
+           FROM updated u
+           LEFT JOIN (
+               SELECT user_id, COUNT(*) as device_count
+               FROM user_devices
+               GROUP BY user_id
+           ) d ON u.id = d.user_id"#
     )
     .bind(&req.name)
     .bind(&req.email)
@@ -269,3 +298,40 @@ async fn delete_user(
 
     Ok(Json(json!({ "success": true, "data": null })))
 }
+
+async fn get_role_counts(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthUser>,
+) -> AppResult<Json<serde_json::Value>> {
+    if auth.role != "admin" {
+        return Err(AppError::Forbidden("Akses ditolak".into()));
+    }
+
+    struct RoleCount {
+        role: String,
+        count: i64,
+    }
+
+    let counts = sqlx::query_as!(
+        RoleCount,
+        r#"SELECT role, COUNT(*) as "count!" FROM users GROUP BY role"#
+    )
+    .fetch_all(&state.db.pool)
+    .await?;
+
+    let mut map = serde_json::Map::new();
+    map.insert("admin".to_string(), json!(0));
+    map.insert("kasir".to_string(), json!(0));
+    map.insert("officer".to_string(), json!(0));
+    map.insert("investor".to_string(), json!(0));
+
+    for item in counts {
+        map.insert(item.role, json!(item.count));
+    }
+
+    Ok(Json(json!({
+        "success": true,
+        "data": map
+    })))
+}
+

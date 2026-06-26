@@ -8,6 +8,7 @@
   import Modal from '$lib/components/ui/Modal.svelte';
   import Spinner from '$lib/components/ui/Spinner.svelte';
   import { Shield, Edit2, Users, Check } from 'lucide-svelte';
+  import { usersApi } from '$lib/api/resources';
 
   let roles: Role[] = [];
   let allPermissions: { module: string; permissions: Permission[] }[] = [];
@@ -64,8 +65,21 @@
   ];
 
   onMount(async () => {
-    await new Promise(r => setTimeout(r, 300));
-    roles = demoRoles;
+    try {
+      const res = await usersApi.roleCounts();
+      if (res.success && res.data) {
+        roles = demoRoles.map(r => ({
+          ...r,
+          user_count: res.data[r.slug] ?? 0
+        }));
+      } else {
+        roles = demoRoles;
+      }
+    } catch (e) {
+      console.error('Gagal memuat jumlah pengguna per role:', e);
+      roles = demoRoles;
+    }
+
     // Group permissions by module
     const modules = [...new Set(permissionsData.map(p => p.module))];
     allPermissions = modules.map(mod => ({
@@ -227,7 +241,7 @@
 </Modal>
 
 <style>
-  .page { display:flex;flex-direction:column;gap:20px;max-width:1000px; }
+  .page { display:flex;flex-direction:column;gap:20px;max-width:1400px; }
   .page-header { display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px; }
   .page-header h1 { font-size:1.5rem;font-weight:700;letter-spacing:-0.025em; }
 

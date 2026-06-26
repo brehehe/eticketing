@@ -27,7 +27,7 @@
     { href:'/users',          label:'Pengguna',     icon:Users,           roles:['admin'] },
     { href:'/roles',          label:'Role & Akses', icon:UserCog,         roles:['admin'] },
     { divider:true, label:'Laporan', roles:['admin','investor'] },
-    { href:'/laporan',               label:'Penjualan Harian', icon:BarChart3,    roles:['admin','investor'] },
+    { href:'/laporan',               label:'Penjualan', icon:BarChart3,    roles:['admin','investor'] },
     { href:'/laporan/produk',        label:'Per Produk',       icon:TrendingUp,   roles:['admin','investor'] },
     { href:'/laporan/metode-bayar',  label:'Metode Bayar',     icon:CreditCard,   roles:['admin'] },
     { href:'/laporan/investor',      label:'Investor',         icon:DollarSign,   roles:['admin','investor'] },

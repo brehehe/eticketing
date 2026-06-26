@@ -2,11 +2,12 @@
   export let data: any = {};
   export let form: any = undefined;
   import { onMount, afterUpdate } from 'svelte';
-  import { currency, number } from '$lib/utils/format';
+  import { currency, number, date } from '$lib/utils/format';
   import { reportsApi } from '$lib/api/resources';
   import { toast } from '$lib/stores/toast';
   import type { ProductReport } from '$lib/types';
   import { TrendingUp, TrendingDown, Download, Filter, Calendar } from 'lucide-svelte';
+  import { exportToExcel, exportToPDF } from '$lib/utils/export';
 
   let loading = true;
   let dateFrom = new Date(Date.now() - 30 * 86400000).toISOString().slice(0,10);
@@ -79,6 +80,37 @@
       });
     });
   }
+
+  function handleExportExcel() {
+    const headers = ['#', 'Produk', 'Kategori', 'Qty Terjual', 'Revenue', 'Growth'];
+    const rows = products.map((p, i) => [
+      i + 1,
+      p.product_name ?? '-',
+      p.category ?? '-',
+      p.qty_sold ?? 0,
+      p.revenue ?? 0,
+      p.growth_pct !== undefined && p.growth_pct !== null ? `${p.growth_pct}%` : '-'
+    ]);
+    exportToExcel(headers, rows, `laporan_produk_${dateFrom}_to_${dateTo}`);
+  }
+
+  function handleExportPDF() {
+    const headers = ['#', 'Produk', 'Kategori', 'Qty Terjual', 'Revenue', 'Growth'];
+    const rows = products.map((p, i) => [
+      i + 1,
+      p.product_name ?? '-',
+      p.category ?? '-',
+      number(p.qty_sold ?? 0),
+      currency(p.revenue ?? 0),
+      p.growth_pct !== undefined && p.growth_pct !== null ? `${p.growth_pct}%` : '-'
+    ]);
+    const stats = [
+      { label: 'Total Revenue', value: currency(totalRevenue) },
+      { label: 'Total Qty Terjual', value: number(totalQty) },
+      { label: 'Jumlah Produk', value: String(products.length) }
+    ];
+    exportToPDF('Laporan Penjualan Per Produk', `${date(dateFrom)} - ${date(dateTo)}`, stats, headers, rows);
+  }
 </script>
 
 <svelte:head><title>Laporan Per Produk — TiketKu</title></svelte:head>
@@ -89,7 +121,10 @@
       <h1>Laporan Per Produk</h1>
       <p style="color:var(--text-2);font-size:0.875rem;margin-top:2px;">{products.length} produk</p>
     </div>
-    <button class="btn btn-secondary" style="gap:6px;"><Download size={14} /> Export</button>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-secondary" style="gap:6px;" on:click={handleExportExcel}><Download size={14} /> Export Excel</button>
+      <button class="btn btn-secondary" style="gap:6px;" on:click={handleExportPDF}><Download size={14} /> Export PDF</button>
+    </div>
   </div>
 
   <!-- Filter -->
@@ -158,7 +193,7 @@
 </div>
 
 <style>
-  .page { display:flex;flex-direction:column;gap:20px;max-width:1100px; }
+  .page { display:flex;flex-direction:column;gap:20px;max-width:1400px; }
   .page-header { display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px; }
   .page-header h1 { font-size:1.5rem;font-weight:700;letter-spacing:-0.025em; }
   .stats-row { display:grid;grid-template-columns:repeat(3,1fr);gap:14px; }

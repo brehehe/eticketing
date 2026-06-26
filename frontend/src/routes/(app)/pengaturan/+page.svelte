@@ -268,7 +268,7 @@
 </div>
 
 <style>
-  .settings-layout { display:grid; grid-template-columns:200px 1fr; gap:20px; align-items:start; max-width:900px; }
+  .settings-layout { display:grid; grid-template-columns:200px 1fr; gap:20px; align-items:start; max-width:1400px; }
   .settings-nav { padding:6px; display:flex; flex-direction:column; gap:2px; position:sticky; top:calc(var(--topbar-h) + 24px); }
   .settings-tab { display:flex; align-items:center; gap:8px; padding:9px 12px; border-radius:var(--r-md); font-size:0.875rem; font-weight:500; color:var(--text-2); cursor:pointer; border:none; background:none; font-family:var(--font-sans); text-align:left; width:100%; transition:all var(--ease-fast); }
   .settings-tab:hover  { background:var(--bg-muted); color:var(--text-1); }

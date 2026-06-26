@@ -2,11 +2,12 @@
   export let data: any = {};
   export let form: any = undefined;
   import { onMount, afterUpdate } from 'svelte';
-  import { currency, number } from '$lib/utils/format';
+  import { currency, number, date } from '$lib/utils/format';
   import { api } from '$lib/api/client';
   import { toast } from '$lib/stores/toast';
   import { userRole } from '$lib/stores/auth';
   import { TrendingUp, Download, Calendar, Filter, Users, Package } from 'lucide-svelte';
+  import { exportToExcel, exportToPDF } from '$lib/utils/export';
 
   let loading = true;
   let dateFrom = new Date(Date.now() - 30 * 86400000).toISOString().slice(0,10);
@@ -99,6 +100,37 @@
       });
     });
   }
+
+  function handleExportExcel() {
+    const headers = ['Produk', 'Investor', 'Qty Terjual', 'Total Revenue', 'Fee %', 'Share Investor'];
+    const rows = reportData.map(row => [
+      row.product_name ?? '-',
+      row.investor_name ?? '-',
+      row.qty_sold ?? 0,
+      row.revenue ?? 0,
+      `${row.revenue_pct ?? 0}%`,
+      row.investor_share ?? 0
+    ]);
+    exportToExcel(headers, rows, `laporan_investor_${dateFrom}_to_${dateTo}`);
+  }
+
+  function handleExportPDF() {
+    const headers = ['Produk', 'Investor', 'Qty Terjual', 'Total Revenue', 'Fee %', 'Share Investor'];
+    const rows = reportData.map(row => [
+      row.product_name ?? '-',
+      row.investor_name ?? '-',
+      number(row.qty_sold ?? 0),
+      currency(row.revenue ?? 0),
+      `${row.revenue_pct ?? 0}%`,
+      currency(row.investor_share ?? 0)
+    ]);
+    const stats = [
+      { label: 'Total Revenue', value: currency(totalRevenue) },
+      { label: 'Share Investor', value: currency(investorRevenue) },
+      { label: 'Jumlah Produk', value: String(reportData.length) }
+    ];
+    exportToPDF('Laporan Investor', `${date(dateFrom)} - ${date(dateTo)}`, stats, headers, rows);
+  }
 </script>
 
 <svelte:head><title>Laporan Investor — TiketKu</title></svelte:head>
@@ -109,7 +141,10 @@
       <h1>Laporan Investor</h1>
       <p style="color:var(--text-2);font-size:0.875rem;margin-top:2px;">Pendapatan per investor dan produk</p>
     </div>
-    <button class="btn btn-secondary" style="gap:6px;"><Download size={14} /> Export</button>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-secondary" style="gap:6px;" on:click={handleExportExcel}><Download size={14} /> Export Excel</button>
+      <button class="btn btn-secondary" style="gap:6px;" on:click={handleExportPDF}><Download size={14} /> Export PDF</button>
+    </div>
   </div>
 
   <!-- Filter -->
@@ -207,7 +242,7 @@
 </div>
 
 <style>
-  .page { display:flex;flex-direction:column;gap:20px;max-width:1100px; }
+  .page { display:flex;flex-direction:column;gap:20px;max-width:1400px; }
   .page-header { display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px; }
   .page-header h1 { font-size:1.5rem;font-weight:700;letter-spacing:-0.025em; }
   .stats-row { display:grid;grid-template-columns:repeat(3,1fr);gap:14px; }

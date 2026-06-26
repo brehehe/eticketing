@@ -77,19 +77,16 @@ fi
 
 # 6. Setup PostgreSQL Database
 echo -e "\n${BLUE}[4/8] Mengonfigurasi PostgreSQL...${NC}"
-# Pastikan Postgres aktif
-if systemctl is-active --quiet postgresql; then
-  echo -e "${GREEN}Service PostgreSQL sudah terinstal dan aktif.${NC}"
-else
-  echo -e "${YELLOW}Mengaktifkan service PostgreSQL...${NC}"
-  systemctl start postgresql || true
-  systemctl enable postgresql || true
-fi
 
-echo -n "Apakah Anda ingin menggunakan PostgreSQL yang sudah ada dengan kredensial kustom? (y/n) [default: n]: "
-read USE_EXISTING_DB
+echo -e "Apakah PostgreSQL sudah di-install dan dikonfigurasi?"
+echo "  [1] Sudah (Menggunakan database yang sudah ada / eksternal)"
+echo "  [2] Belum (Instal dan konfigurasi otomatis di VPS ini)"
+echo -n "Pilihan Anda (1/2) [default: 2]: "
+read PG_STATUS
+PG_STATUS=${PG_STATUS:-2}
 
-if [ "$USE_EXISTING_DB" = "y" ] || [ "$USE_EXISTING_DB" = "Y" ]; then
+if [ "$PG_STATUS" = "1" ]; then
+  # Skenario 1: PostgreSQL sudah siap / kustom
   echo -n "Masukkan Host PostgreSQL [default: localhost]: "
   read DB_HOST
   DB_HOST=${DB_HOST:-localhost}
@@ -110,12 +107,21 @@ if [ "$USE_EXISTING_DB" = "y" ] || [ "$USE_EXISTING_DB" = "Y" ]; then
   read -s DB_PASS
   echo "" # Newline setelah input password tersembunyi
 else
-  # Default setup (Auto create new user & database locally)
+  # Skenario 2: Belum di-install / Belum dikonfigurasi (lokal)
   DB_HOST="localhost"
   DB_PORT="5432"
   DB_NAME="tiketku"
   DB_USER="tiketku"
   DB_PASS="tiketku"
+
+  # Pastikan Postgres aktif
+  if systemctl is-active --quiet postgresql; then
+    echo -e "${GREEN}Service PostgreSQL sudah aktif.${NC}"
+  else
+    echo -e "${YELLOW}Mengaktifkan service PostgreSQL...${NC}"
+    systemctl start postgresql || true
+    systemctl enable postgresql || true
+  fi
 
   echo -e "\nMembuat user & database default..."
   sudo -u postgres psql -c "CREATE USER $DB_USER WITH PASSWORD '$DB_PASS';" 2>/dev/null || true

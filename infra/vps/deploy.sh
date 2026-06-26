@@ -47,8 +47,13 @@ echo -e "=============================================\n"
 
 # 3. Install System Dependencies (Ubuntu/Debian)
 echo -e "\n${BLUE}[1/8] Menginstal paket-paket dasar Linux...${NC}"
-apt-get update
-apt-get install -y curl wget git build-essential pkg-config libssl-dev lsof nginx redis-server postgresql postgresql-contrib certbot python3-certbot-nginx
+if command -v nginx &> /dev/null && command -v psql &> /dev/null && command -v redis-server &> /dev/null; then
+  echo -e "${GREEN}Paket dasar Linux (Nginx, PostgreSQL, Redis) sudah terinstal.${NC}"
+else
+  echo -e "${YELLOW}Menginstal paket yang belum lengkap...${NC}"
+  apt-get update
+  apt-get install -y curl wget git build-essential pkg-config libssl-dev lsof nginx redis-server postgresql postgresql-contrib certbot python3-certbot-nginx
+fi
 
 # 4. Install Bun (Jika belum terpasang)
 if ! command -v bun &> /dev/null; then
@@ -73,8 +78,13 @@ fi
 # 6. Setup PostgreSQL Database
 echo -e "\n${BLUE}[4/8] Mengonfigurasi PostgreSQL...${NC}"
 # Pastikan Postgres aktif
-systemctl start postgresql || true
-systemctl enable postgresql || true
+if systemctl is-active --quiet postgresql; then
+  echo -e "${GREEN}Service PostgreSQL sudah terinstal dan aktif.${NC}"
+else
+  echo -e "${YELLOW}Mengaktifkan service PostgreSQL...${NC}"
+  systemctl start postgresql || true
+  systemctl enable postgresql || true
+fi
 
 echo -n "Apakah Anda ingin menggunakan PostgreSQL yang sudah ada dengan kredensial kustom? (y/n) [default: n]: "
 read USE_EXISTING_DB

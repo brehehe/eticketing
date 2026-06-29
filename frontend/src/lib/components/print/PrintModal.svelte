@@ -858,7 +858,7 @@
     padding-left: 8px;
     padding-top: 0;
   }
-  [data-theme="dark"] .preview-row.sm-details {
+  :global([data-theme="dark"]) .preview-row.sm-details {
     color: #aaa;
   }
 
